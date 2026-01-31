@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visual RAG Learning Tool</title>
+
+  <!-- =====================
+       MODERN UI STYLING
+       ===================== -->
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: linear-gradient(135deg, #020617, #020617);
+      color: #e5e7eb;
+      margin: 0;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 28px;
+    }
+
+    .step {
+      background: #020617;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 22px;
+      border: 1px solid #1e293b;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+    }
+
+    .step h2 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      color: #38bdf8;
+    }
+
+    .desc {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+
+    textarea, input {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #1e293b;
+      font-size: 14px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px;
+      width: 100%;
+      border-radius: 8px;
+      border: none;
+      background: #38bdf8;
+      color: #020617;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover { opacity: 0.9; }
+
+    .output {
+      background: #020617;
+      border: 1px dashed #334155;
+      padding: 12px;
+      margin-top: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .progress {
+      font-size: 12px;
+      margin-top: 6px;
+      color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔍 Visual RAG Learning Tool</h1>
+
+<!-- =====================
+     STEP 1: PREPARE KNOWLEDGE
+     ===================== -->
+<div class="step">
+  <h2>1️⃣ Prepare the Knowledge Source</h2>
+  <div class="desc">
+    Enter trusted data. This knowledge lives outside the LLM and can be updated anytime.
+  </div>
+  <textarea id="rawText" rows="4" placeholder="Paste documents, FAQs, or notes here..."></textarea>
+  <input id="chunkSize" type="number" value="40" placeholder="Chunk size (words)" />
+  <input id="overlap" type="number" value="10" placeholder="Sliding window overlap" />
+  <button onclick="chunkText()">Chunk Text</button>
+  <div id="chunkOutput" class="output"></div>
+  <div id="chunkProgress" class="progress"></div>
+</div>
+
+<!-- =====================
+     STEP 2: CHUNKING
+     ===================== -->
+<div class="step">
+  <h2>2️⃣ Chunk the Data Intelligently</h2>
+  <div class="desc">
+    Text is split into overlapping chunks to preserve meaning and improve retrieval accuracy.
+  </div>
+</div>
+
+<!-- =====================
+     STEP 3: EMBEDDINGS
+     ===================== -->
+<div class="step">
+  <h2>3️⃣ Generate Vector Embeddings</h2>
+  <div class="desc">
+    Each chunk is converted into a vector representing semantic meaning.
+  </div>
+  <button onclick="createEmbeddings()">Create Embeddings</button>
+  <div id="embeddingOutput" class="output"></div>
+  <button onclick="saveVectors()">Save Vectors</button>
+  <div id="embedProgress" class="progress"></div>
+</div>
+
+<!-- =====================
+     STEP 4 & 5: QUERY
+     ===================== -->
+<div class="step">
+  <h2>4️⃣ Process User Query</h2>
+  <div class="desc">
+    The query is embedded into the same vector space as the stored data.
+  </div>
+  <input id="userQuery" placeholder="Ask a question" />
+  <input id="topN" type="number" value="2" placeholder="Top N chunks" />
+  <button onclick="askQuery()">Ask</button>
+  <div id="retrievalOutput" class="output"></div>
+</div>
+
+<!-- =====================
+     STEP 6: PROMPT
+     ===================== -->
+<div class="step">
+  <h2>5️⃣ Retrieve Context & Build Prompt</h2>
+  <div class="desc">
+    Top matching chunks are injected into a system prompt.
+  </div>
+  <div id="promptOutput" class="output"></div>
+</div>
+
+<!-- =====================
+     STEP 7: LLM ANSWER
+     ===================== -->
+<div class="step">
+  <h2>6️⃣ Generate Grounded Answer</h2>
+  <div class="desc">
+    The LLM answers using only retrieved context, reducing hallucination.
+  </div>
+  <div id="answerOutput" class="output"></div>
+</div>
+
+<script>
+  // =====================
+  // GLOBAL STATE
+  // =====================
+  let chunks = [];
+  let vectors = [];
+
+  // =====================
+  // STEP 1: CHUNKING LOGIC
+  // =====================
+  function chunkText() {
+    const text = document.getElementById('rawText').value;
+    const size = parseInt(document.getElementById('chunkSize').value);
+    const overlap = parseInt(document.getElementById('overlap').value);
+
+    const words = text.split(/\s+/);
+    chunks = [];
+
+    for (let i = 0; i < words.length; i += size - overlap) {
+      chunks.push(words.slice(i, i + size).join(' '));
+    }
+
+    document.getElementById('chunkOutput').textContent = chunks
+      .map((c, i) => `Chunk ${i + 1}: ${c}`)
+      .join('\n\n');
+
+    document.getElementById('chunkProgress').textContent = '✅ Knowledge chunked';
+  }
+
+  // =====================
+  // STEP 3: EMBEDDINGS
+  // =====================
+  function createEmbeddings() {
+    // Simple word-hash embeddings for learning purpose
+    vectors = chunks.map(chunk => embed(chunk));
+
+    document.getElementById('embeddingOutput').textContent = vectors
+      .map((v, i) => `Chunk ${i + 1} → Vector [${v.slice(0, 6).join(', ')} ...]`)
+      .join('\n');
+
+    document.getElementById('embedProgress').textContent = '✅ Embeddings generated';
+  }
+
+  // =====================
+  // STEP 4: STORE VECTORS
+  // =====================
+  function saveVectors() {
+    localStorage.setItem('rag_store', JSON.stringify({ chunks, vectors }));
+    document.getElementById('embedProgress').textContent = '💾 Stored in vector database (localStorage)';
+  }
+
+  // =====================
+  // STEP 5–7: QUERY → RETRIEVE → GENERATE
+  // =====================
+  function askQuery() {
+    const store = JSON.parse(localStorage.getItem('rag_store'));
+    const query = document.getElementById('userQuery').value;
+    const topN = parseInt(document.getElementById('topN').value);
+
+    const queryVector = embed(query);
+
+    const scored = store.vectors.map((v, i) => ({
+      chunk: store.chunks[i],
+      score: cosine(queryVector, v)
+    })).sort((a, b) => b.score - a.score);
+
+    const topChunks = scored.slice(0, topN);
+
+    document.getElementById('retrievalOutput').textContent = topChunks
+      .map((c, i) => `#${i + 1} (score ${c.score.toFixed(2)}): ${c.chunk}`)
+      .join('\n\n');
+
+    const prompt = `Answer the user's query using only the provided context.\n\nQuery: ${query}\n\nContext:\n${topChunks.map(c => c.chunk).join('\n---\n')}`;
+
+    document.getElementById('promptOutput').textContent = prompt;
+    document.getElementById('answerOutput').textContent = simulateLLM(query, topChunks);
+  }
+
+  // =====================
+  // UTILS
+  // =====================
+
+  // Very simple embedding logic (educational)
+  function embed(text) {
+    const vec = new Array(32).fill(0);
+    text.toLowerCase().split(/\s+/).forEach(word => {
+      let hash = 0;
+      for (let c of word) hash += c.charCodeAt(0);
+      vec[hash % vec.length]++;
+    });
+    return vec;
+  }
+
+  // Cosine similarity
+  function cosine(a, b) {
+    let dot = 0, ma = 0, mb = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      ma += a[i] ** 2;
+      mb += b[i] ** 2;
+    }
+    return dot / (Math.sqrt(ma) * Math.sqrt(mb) || 1);
+  }
+
+  // Simulated LLM output
+  function simulateLLM(query, chunks) {
+    return `🤖 Simulated LLM Answer\n\nThe question "${query}" is answered using retrieved context:\n\n${chunks.map(c => '• ' + c.chunk.slice(0, 120) + '...').join('\n')}`;
+  }
+</script>
+
+</body>
+</html>
